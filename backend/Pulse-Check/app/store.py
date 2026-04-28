@@ -52,3 +52,18 @@ class MonitorStore:
             )
             self._monitors[payload.id] = mon
             return mon
+
+    async def heartbeat(self, monitor_id: str) -> Monitor:
+        """Reset countdown; unpause if paused; revive if down (documented behavior)."""
+        async with self._lock:
+            mon = self._monitors.get(monitor_id)
+            if mon is None:
+                raise KeyError(monitor_id)
+            now = datetime.now(UTC)
+            if mon.status == "paused":
+                mon.status = "up"
+            elif mon.status == "down":
+                mon.status = "up"
+            mon.deadline = now + timedelta(seconds=mon.timeout_seconds)
+            mon.updated_at = now
+            return mon

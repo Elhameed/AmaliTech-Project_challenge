@@ -58,3 +58,21 @@ async def create_monitor(
             detail=f'Monitor id "{payload.id}" already exists.',
         ) from None
     return MonitorRegisterResponse(message=f'Monitor "{payload.id}" registered and timer started.')
+
+
+@app.post(
+    "/monitors/{monitor_id}/heartbeat",
+    status_code=status.HTTP_200_OK,
+    tags=["monitors"],
+    summary="Send heartbeat to reset countdown",
+)
+async def heartbeat(
+    monitor_id: str,
+    store: MonitorStore = Depends(get_store),
+) -> dict[str, str]:
+    """Reset the monitor countdown from the beginning."""
+    try:
+        await store.heartbeat(monitor_id)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found.") from None
+    return {"message": "Heartbeat received; timer reset."}
