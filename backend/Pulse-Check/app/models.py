@@ -1,6 +1,10 @@
 """Pydantic models for API payloads."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+MonitorStatus = Literal["up", "down", "paused"]
 
 
 class MonitorCreate(BaseModel):
@@ -15,3 +19,16 @@ class MonitorRegisterResponse(BaseModel):
     """Response after creating a monitor."""
 
     message: str
+
+
+class MonitorDetail(BaseModel):
+    """Observability payload for a single monitor."""
+
+    id: str
+    status: MonitorStatus
+    timeout: int
+    alert_email: str
+    seconds_remaining: float | None = Field(
+        default=None,
+        description="Seconds until timeout when status is up and a deadline is set.",
+    )

@@ -81,6 +81,17 @@ class MonitorStore:
             mon.updated_at = now
             return mon
 
+    async def get(self, monitor_id: str) -> Monitor | None:
+        async with self._lock:
+            return self._monitors.get(monitor_id)
+
+    async def list_monitors(self, status_filter: MonitorStatus | None = None) -> list[Monitor]:
+        async with self._lock:
+            items = list(self._monitors.values())
+        if status_filter is None:
+            return items
+        return [m for m in items if m.status == status_filter]
+
     async def process_expired_monitors(
         self,
         *,

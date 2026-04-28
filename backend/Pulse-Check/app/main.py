@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 
 from app.config import Settings, load_settings
-from app.models import MonitorCreate, MonitorRegisterResponse
+from app.models import MonitorCreate, MonitorDetail, MonitorRegisterResponse, MonitorStatus
 from app.scheduler import scheduler_loop
-from app.store import DuplicateMonitorError, MonitorStore
+from app.store import DuplicateMonitorError, Monitor, MonitorStore
 
 
 @asynccontextmanager
@@ -42,6 +44,20 @@ def get_store(request: Request) -> MonitorStore:
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def _monitor_to_detail(mon: Monitor) -> MonitorDetail:
+    now = datetime.now(UTC)
+    remaining: float | None = None
+    if mon.status == "up" and mon.deadline is not None:
+        remaining = max(0.0, (mon.deadline - now).total_seconds())
+    return MonitorDetail(
+        id=mon.id,
+        status=mon.status,
+        timeout=mon.timeout_seconds,
+        alert_email=mon.alert_email,
+        seconds_remaining=remaining,
+    )
 
 
 @app.get("/health", tags=["ops"])
@@ -105,3 +121,33 @@ async def pause_monitor(
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found.") from None
     return {"message": "Monitor paused; timer stopped until next heartbeat."}
+
+
+@app.get(
+    "/monitors",
+    tags=["monitors"],
+    summary="List monitors (developer's choice)",
+)
+async def list_monitors(
+    store: MonitorStore = Depends(get_store),
+    status_filter: Annotated[MonitorStatus | None, Query(alias="status")] = None,
+) -> list[MonitorDetail]:
+    """Return all monitors, optionally filtered by status."""
+    monitors = await store.list_monitors(status_filter=status_filter)
+    return [_monitor_to_detail(m) for m in monitors]
+
+
+@app.get(
+    "/monitors/{monitor_id}",
+    tags=["monitors"],
+    summary="Get monitor details (developer's choice)",
+)
+async def get_monitor(
+    monitor_id: str,
+    store: MonitorStore = Depends(get_store),
+) -> MonitorDetail:
+    """Return current monitor state including approximate seconds remaining."""
+    mon = await store.get(monitor_id)
+    if mon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found.")
+    return _monitor_to_detail(mon)
