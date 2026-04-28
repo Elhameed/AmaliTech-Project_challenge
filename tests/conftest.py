@@ -12,7 +12,8 @@ from app.main import app
 @pytest.fixture(autouse=True)
 def _test_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Speed up suite runs; avoid cleanup loop during tests."""
-    monkeypatch.setenv("PAYMENT_DELAY_SECONDS", "0.05")
+    # Give enough time for deterministic in-flight assertions.
+    monkeypatch.setenv("PAYMENT_DELAY_SECONDS", "0.2")
     monkeypatch.setenv("CLEANUP_INTERVAL_SECONDS", "3600")
 
 

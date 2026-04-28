@@ -96,7 +96,8 @@ async def test_mismatch_while_in_flight_returns_409(client: AsyncClient) -> None
     body_b = {"amount": 2, "currency": "GHS"}
 
     task = asyncio.create_task(client.post("/process-payment", json=body_a, headers=headers))
-    await asyncio.sleep(0.01)
+    # Yield to let request A acquire ownership and enter its delay.
+    await asyncio.sleep(0)
     conflict = await client.post("/process-payment", json=body_b, headers=headers)
     first = await task
 
