@@ -46,8 +46,8 @@ async def process_payment(
     """
     Simulate payment processing (~2 seconds) and return a success response.
 
-    This endpoint requires the Idempotency-Key header, but does not yet implement
-    in-flight coordination (added in the next commits).
+    This endpoint requires the Idempotency-Key header and guarantees at-most-once
+    processing per key/body. Concurrent identical requests wait for the first.
     """
     if idempotency_key is None or not idempotency_key.strip():
         raise HTTPException(
@@ -59,22 +59,33 @@ async def process_payment(
     request_hash = fingerprint_payment(payment)
 
     try:
-        existing = await store.get_if_match(key, request_hash)
+        kind, rec = await store.decide(key, request_hash)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Idempotency key already used for a different request body.",
         ) from None
 
-    if existing is not None:
+    if kind == "replay":
+        assert rec.response is not None
         return JSONResponse(
-            status_code=existing.status_code,
-            content=existing.body,
+            status_code=rec.response.status_code,
+            content=rec.response.body,
             headers={"X-Cache-Hit": "true"},
         )
+
+    if kind == "waiter":
+        await rec.done.wait()
+        assert rec.response is not None
+        return JSONResponse(
+            status_code=rec.response.status_code,
+            content=rec.response.body,
+            headers={"X-Cache-Hit": "true"},
+        )
+
     await asyncio.sleep(2)
     payload = PaymentResponse(message=f"Charged {payment.amount} {payment.currency}").model_dump()
-    await store.put(
+    await store.complete(
         key,
         StoredResponse(request_hash=request_hash, status_code=status.HTTP_201_CREATED, body=payload),
     )
