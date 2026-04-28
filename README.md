@@ -1,6 +1,6 @@
 # Idempotency-Gateway
 
-This repository is the **AmaliTech Idempotency-Gateway** submission (project files live at the repository root).
+This repository is the **AmaliTech Idempotency-Gateway** submission.
 
 REST API that implements a **pay-once** idempotency layer for payment-style `POST` requests. Clients send an `Idempotency-Key` header; retries with the same key and body receive the **exact same** HTTP status and JSON body without re-running processing.
 
