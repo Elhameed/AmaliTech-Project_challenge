@@ -87,3 +87,21 @@ async def heartbeat(
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found.") from None
     return {"message": "Heartbeat received; timer reset."}
+
+
+@app.post(
+    "/monitors/{monitor_id}/pause",
+    status_code=status.HTTP_200_OK,
+    tags=["monitors"],
+    summary="Pause monitoring (snooze)",
+)
+async def pause_monitor(
+    monitor_id: str,
+    store: MonitorStore = Depends(get_store),
+) -> dict[str, str]:
+    """Pause the monitor; heartbeat resumes monitoring."""
+    try:
+        await store.pause(monitor_id)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found.") from None
+    return {"message": "Monitor paused; timer stopped until next heartbeat."}

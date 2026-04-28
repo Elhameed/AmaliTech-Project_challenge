@@ -69,6 +69,18 @@ class MonitorStore:
             mon.updated_at = now
             return mon
 
+    async def pause(self, monitor_id: str) -> Monitor:
+        """Stop countdown; no alerts while paused."""
+        async with self._lock:
+            mon = self._monitors.get(monitor_id)
+            if mon is None:
+                raise KeyError(monitor_id)
+            now = datetime.now(UTC)
+            mon.status = "paused"
+            mon.deadline = None
+            mon.updated_at = now
+            return mon
+
     async def process_expired_monitors(
         self,
         *,
