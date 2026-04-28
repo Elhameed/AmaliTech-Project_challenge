@@ -4,6 +4,26 @@ This repository is the **AmaliTech Idempotency-Gateway** submission.
 
 REST API that implements a **pay-once** idempotency layer for payment-style `POST` requests. Clients send an `Idempotency-Key` header; retries with the same key and body receive the **exact same** HTTP status and JSON body without re-running processing.
 
+## Live Demo (Render)
+
+- **Base URL**: `https://amalitech-project-challenge.onrender.com`
+- **Swagger UI**: `https://amalitech-project-challenge.onrender.com/docs`
+- **ReDoc**: `https://amalitech-project-challenge.onrender.com/redoc`
+- **OpenAPI JSON**: `https://amalitech-project-challenge.onrender.com/openapi.json`
+
+### Quick test (first request)
+
+```bash
+curl -sS -X POST "https://amalitech-project-challenge.onrender.com/process-payment" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: render-demo-1" \
+  -d "{\"amount\":100,\"currency\":\"GHS\"}"
+```
+
+### Quick test (safe retry)
+
+Repeat the same `curl`. The second call should return immediately and include `X-Cache-Hit: true`.
+
 ## Architecture
 
 ### Sequence (happy path, replay, and in-flight)
