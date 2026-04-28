@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+
 from app.config import Settings, load_settings
 from app.models import MonitorCreate, MonitorRegisterResponse
+from app.scheduler import scheduler_loop
 from app.store import DuplicateMonitorError, MonitorStore
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.settings = load_settings()
-    app.state.store = MonitorStore()
+    settings = load_settings()
+    store = MonitorStore()
+    scheduler_task = asyncio.create_task(scheduler_loop(store, settings))
+    app.state.settings = settings
+    app.state.store = store
     yield
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(

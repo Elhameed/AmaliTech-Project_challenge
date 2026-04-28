@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
 from typing import Literal
 
 from app.models import MonitorCreate
@@ -67,3 +68,23 @@ class MonitorStore:
             mon.deadline = now + timedelta(seconds=mon.timeout_seconds)
             mon.updated_at = now
             return mon
+
+    async def process_expired_monitors(
+        self,
+        *,
+        emit_alert: Callable[[str], None],
+        now: datetime | None = None,
+    ) -> None:
+        """Mark monitors as down when deadline passes; invoke emit_alert once per monitor."""
+        current = now or datetime.now(UTC)
+        async with self._lock:
+            for mon in list(self._monitors.values()):
+                if mon.status != "up" or mon.deadline is None:
+                    continue
+                if current < mon.deadline:
+                    continue
+                mon_id = mon.id
+                mon.status = "down"
+                mon.deadline = None
+                mon.updated_at = current
+                emit_alert(mon_id)
