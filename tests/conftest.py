@@ -10,13 +10,18 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def _fast_scheduler(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SCHEDULER_TICK_SECONDS", "0.05")
+def _test_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Speed up suite runs; avoid cleanup loop during tests."""
+    # Give enough time for deterministic in-flight assertions.
+    monkeypatch.setenv("PAYMENT_DELAY_SECONDS", "0.2")
+    monkeypatch.setenv("CLEANUP_INTERVAL_SECONDS", "3600")
 
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
+    """HTTP client with ASGI lifespan (store initialized)."""
     async with LifespanManager(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+
