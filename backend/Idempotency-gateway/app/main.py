@@ -3,28 +3,45 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi import Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.config import Settings, load_settings
 from app.idempotency_store import IdempotencyStore, StoredResponse, fingerprint_payment
 from app.models import PaymentRequest, PaymentResponse
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = load_settings()
+    store = IdempotencyStore(settings)
+    cleanup_task = asyncio.create_task(store.cleanup_loop())
+    app.state.settings = settings
+    app.state.idempotency_store = store
+    yield
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
 
 app = FastAPI(
     title="Idempotency-Gateway",
     description='Pay-once protocol: POST /process-payment with "Idempotency-Key" header.',
     version="0.1.0",
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    app.state.idempotency_store = IdempotencyStore()
-
 
 def _get_store() -> IdempotencyStore:
     return app.state.idempotency_store
+
+
+def _get_settings() -> Settings:
+    return app.state.settings
 
 
 @app.get("/health", tags=["ops"])
@@ -41,6 +58,7 @@ async def health() -> dict[str, str]:
 async def process_payment(
     payment: PaymentRequest,
     store: IdempotencyStore = Depends(_get_store),
+    settings: Settings = Depends(_get_settings),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> JSONResponse:
     """
@@ -83,7 +101,7 @@ async def process_payment(
             headers={"X-Cache-Hit": "true"},
         )
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(settings.payment_delay_seconds)
     payload = PaymentResponse(message=f"Charged {payment.amount} {payment.currency}").model_dump()
     await store.complete(
         key,
