@@ -1,5 +1,7 @@
 # Idempotency-Gateway
 
+This repository is the **AmaliTech Idempotency-Gateway** submission (project files live at the repository root).
+
 REST API that implements a **pay-once** idempotency layer for payment-style `POST` requests. Clients send an `Idempotency-Key` header; retries with the same key and body receive the **exact same** HTTP status and JSON body without re-running processing.
 
 ## Architecture
@@ -44,7 +46,7 @@ sequenceDiagram
 **Requirements:** Python 3.11+ (3.10+ should work).
 
 ```bash
-cd backend/Idempotency-gateway
+# From the repository root (after cloning)
 python -m venv .venv
 # Windows:
 .venv\Scripts\activate
